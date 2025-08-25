@@ -15,7 +15,7 @@ set(SAMPLE_COMMON_DIR "/root/studies_ws/src/AstraPro/samples/common")
 set (_projname "astra_pro_ros2")
 
 set (${_projname}_SOURCES
-  src/astra_color_publisher.cpp
+  src/color.cpp
 )
 
 # Verifica se os diretórios existem
@@ -48,21 +48,23 @@ include_directories(
   ${SAMPLE_COMMON_DIR}
 )
 
-# ===== EXECUTÁVEL =====
+# ===== EXECUTÁVEIS =====
 
+# ===============================================================
 # ==================== ASTRA COLOR PUBLISHER ====================
-add_executable(astra_color_publisher 
+# ===============================================================
+add_executable(color
   ${${_projname}_SOURCES}  
 )
 
 # ===== LINKAGEM =====
-target_include_directories(astra_color_publisher PUBLIC
+target_include_directories(color PUBLIC
   ${cv_bridge_INCLUDE_DIRS}
 )
 
-set_target_properties(astra_color_publisher PROPERTIES FOLDER "${SAMPLE_DIR_FOLDER}/cpp-api")
+set_target_properties(color PROPERTIES FOLDER "${SAMPLE_DIR_FOLDER}/cpp-api")
 
-ament_target_dependencies(astra_color_publisher
+ament_target_dependencies(color
   rclcpp
   sensor_msgs
   cv_bridge
@@ -71,7 +73,7 @@ ament_target_dependencies(astra_color_publisher
   std_msgs
 )
 
-target_link_libraries(astra_color_publisher
+target_link_libraries(color
   ${OpenCV_LIBS}
   ${cv_bridge_LIBRARIES}
   ${SFML_LIBRARIES}
@@ -85,22 +87,24 @@ target_link_libraries(astra_color_publisher
   -ludev                                   # Para acesso USB (comum em drivers de câmera)
 )
 
-install(TARGETS astra_color_publisher DESTINATION lib/${PROJECT_NAME})
+install(TARGETS color DESTINATION lib/${PROJECT_NAME})
 
 
-# ==================== ASTRA depth PUBLISHER ====================
-add_executable(astra_depth_publisher 
-  src/astra_depth_publisher.cpp 
+# ===============================================================
+# ==================== ASTRA DEPTH PUBLISHER ====================
+# ===============================================================
+add_executable(depth 
+  src/depth.cpp 
 )
 
 # ===== LINKAGEM =====
-target_include_directories(astra_depth_publisher PUBLIC
+target_include_directories(depth PUBLIC
   ${cv_bridge_INCLUDE_DIRS}
 )
 
-set_target_properties(astra_depth_publisher PROPERTIES FOLDER "${SAMPLE_DIR_FOLDER}/cpp-api")
+set_target_properties(depth PROPERTIES FOLDER "${SAMPLE_DIR_FOLDER}/cpp-api")
 
-ament_target_dependencies(astra_depth_publisher
+ament_target_dependencies(depth
   rclcpp
   sensor_msgs
   cv_bridge
@@ -109,7 +113,7 @@ ament_target_dependencies(astra_depth_publisher
   std_msgs
 )
 
-target_link_libraries(astra_depth_publisher
+target_link_libraries(depth
   ${OpenCV_LIBS}
   ${cv_bridge_LIBRARIES}
   ${SFML_LIBRARIES}
@@ -123,10 +127,49 @@ target_link_libraries(astra_depth_publisher
   -ludev                                   # Para acesso USB (comum em drivers de câmera)
 )
 
-install(TARGETS astra_depth_publisher DESTINATION lib/${PROJECT_NAME})
+install(TARGETS depth DESTINATION lib/${PROJECT_NAME})
 
 
+# ===============================================================
+# ==================== ASTRA MULTI PUBLISHER ====================
+# ===============================================================
+add_executable(multi 
+  src/multi.cpp 
+)
 
+# ===== LINKAGEM =====
+target_include_directories(multi PUBLIC
+  ${cv_bridge_INCLUDE_DIRS}
+)
+
+set_target_properties(multi PROPERTIES FOLDER "${SAMPLE_DIR_FOLDER}/cpp-api")
+
+ament_target_dependencies(multi
+  rclcpp
+  sensor_msgs
+  cv_bridge
+  OpenCV
+  image_transport
+  std_msgs
+)
+
+target_link_libraries(multi
+  ${OpenCV_LIBS}
+  ${cv_bridge_LIBRARIES}
+  ${SFML_LIBRARIES}
+  
+  # Bibliotecas da Astra (verifique os nomes no diretório /lib/)
+  ${ASTRA_LIBRARIES}
+  "${ASTRA_SDK_LIB}/libastra_core_api.so"  # Principal
+  "${ASTRA_SDK_LIB}/libastra.so"           # Se existir
+  "${ASTRA_SDK_LIB}/libastra_core.so"      # Se existir
+  # Outras dependências do sistema (se necessário)
+  -ludev                                   # Para acesso USB (comum em drivers de câmera)
+)
+
+install(TARGETS multi DESTINATION lib/${PROJECT_NAME})
+
+# ===== INSTALAÇÃO =====
 
 # Instala as bibliotecas da Astra junto com seu pacote
 install(DIRECTORY ${ASTRA_SDK_LIB}/

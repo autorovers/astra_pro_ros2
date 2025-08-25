@@ -16,15 +16,6 @@
 // #include <key_handler.h>
 
 
-/*   TODO
-
-Usar image transport plugin para otimizar a publicação de imagens
--> Comprimir a image 
--> Paralelismo
-
-*/
-
-
 using namespace std::chrono_literals;
 
 class AstraColorPublisher : public rclcpp::Node, public astra::FrameListener
@@ -56,12 +47,7 @@ public:
         colorStream.start();
         
         reader_->add_listener(*this);
-        
-
-        // rclcpp::QoS qos_profile = rclcpp::QoS(rclcpp::KeepLast(10)).  // guarda últimos 5 frames
-        // best_effort().                                                // não garante entrega, mas é mais rápido
-        // transient_local();                                            // útil para "última imagem", pode ser omitido
-        
+                
         // Timer para manter astra_update rodando
         timer_ = this->create_wall_timer(
             33ms,
@@ -143,6 +129,7 @@ public:
 
 private:
     image_transport::Publisher publisher_;
+
     rclcpp::TimerBase::SharedPtr timer_;
 
     std::unique_ptr<astra::StreamSet> streamSet_;
