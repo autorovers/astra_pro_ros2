@@ -65,7 +65,7 @@ public:
     void init_transport()
     {
         image_transport::ImageTransport it(shared_from_this());
-        publisher_ = it.advertise("/astra/depth", 10);
+        publisher_ = it.advertise("/camera/depth", 10);
     }
 
     virtual void on_frame_ready(astra::StreamReader& reader, astra::Frame& frame) override

@@ -14,10 +14,6 @@ set(SAMPLE_DIR_FOLDER "/root/studies_ws/src/AstraPro/samples")
 set(SAMPLE_COMMON_DIR "/root/studies_ws/src/AstraPro/samples/common")
 set (_projname "astra_pro_ros2")
 
-set (${_projname}_SOURCES
-  src/color.cpp
-)
-
 # Verifica se os diretórios existem
 if(NOT EXISTS ${ASTRA_SDK_INCLUDE})
   message(FATAL_ERROR "ASTRA SDK include dir not found: ${ASTRA_SDK_INCLUDE}")
@@ -40,7 +36,7 @@ find_package(OpenCV REQUIRED)
 find_package(PkgConfig REQUIRED)
 pkg_check_modules(SFML REQUIRED sfml-all)  # Ou sfml-graphics, sfml-window, etc.
 
-# # ===== INCLUDE DIRS =====
+# ===== INCLUDE DIRS =====
 include_directories(
   ${ASTRA_SDK_INCLUDE}       # Headers da Astra
   ${OpenCV_INCLUDE_DIRS}     # Headers do OpenCV
@@ -50,11 +46,18 @@ include_directories(
 
 # ===== EXECUTÁVEIS =====
 
+set("${PROJECT_NAME}_SOURCES"
+  color
+  depth
+  rgbd 
+  camera_info_calibration
+)
+
 # ===============================================================
 # ==================== ASTRA COLOR PUBLISHER ====================
 # ===============================================================
 add_executable(color
-  ${${_projname}_SOURCES}  
+  src/color.cpp  
 )
 
 # ===== LINKAGEM =====
@@ -74,20 +77,19 @@ ament_target_dependencies(color
 )
 
 target_link_libraries(color
+  # OpenCv libs
   ${OpenCV_LIBS}
   ${cv_bridge_LIBRARIES}
+
+  # Visualization
   ${SFML_LIBRARIES}
   
-  # Bibliotecas da Astra (verifique os nomes no diretório /lib/)
+  # Astra libs
   ${ASTRA_LIBRARIES}
-  "${ASTRA_SDK_LIB}/libastra_core_api.so"  # Principal
-  "${ASTRA_SDK_LIB}/libastra.so"           # Se existir
-  "${ASTRA_SDK_LIB}/libastra_core.so"      # Se existir
-  # Outras dependências do sistema (se necessário)
-  -ludev                                   # Para acesso USB (comum em drivers de câmera)
+  "${ASTRA_SDK_LIB}/libastra_core_api.so"  # Main
+  "${ASTRA_SDK_LIB}/libastra.so"           
+  "${ASTRA_SDK_LIB}/libastra_core.so"          
 )
-
-install(TARGETS color DESTINATION lib/${PROJECT_NAME})
 
 
 # ===============================================================
@@ -114,37 +116,36 @@ ament_target_dependencies(depth
 )
 
 target_link_libraries(depth
+  # OpenCv libs
   ${OpenCV_LIBS}
   ${cv_bridge_LIBRARIES}
+
+  # Visualization
   ${SFML_LIBRARIES}
   
-  # Bibliotecas da Astra (verifique os nomes no diretório /lib/)
+  # Astra libs
   ${ASTRA_LIBRARIES}
-  "${ASTRA_SDK_LIB}/libastra_core_api.so"  # Principal
-  "${ASTRA_SDK_LIB}/libastra.so"           # Se existir
-  "${ASTRA_SDK_LIB}/libastra_core.so"      # Se existir
-  # Outras dependências do sistema (se necessário)
-  -ludev                                   # Para acesso USB (comum em drivers de câmera)
+  "${ASTRA_SDK_LIB}/libastra_core_api.so"  # Main
+  "${ASTRA_SDK_LIB}/libastra.so"           
+  "${ASTRA_SDK_LIB}/libastra_core.so" 
 )
 
-install(TARGETS depth DESTINATION lib/${PROJECT_NAME})
-
 
 # ===============================================================
-# ==================== ASTRA MULTI PUBLISHER ====================
+# ==================== ASTRA RGBD-D PUBLISHER ===================
 # ===============================================================
-add_executable(multi 
-  src/multi.cpp 
+add_executable(rgbd 
+  src/rgbd.cpp 
 )
 
 # ===== LINKAGEM =====
-target_include_directories(multi PUBLIC
+target_include_directories(rgbd PUBLIC
   ${cv_bridge_INCLUDE_DIRS}
 )
 
-set_target_properties(multi PROPERTIES FOLDER "${SAMPLE_DIR_FOLDER}/cpp-api")
+set_target_properties(rgbd PROPERTIES FOLDER "${SAMPLE_DIR_FOLDER}/cpp-api")
 
-ament_target_dependencies(multi
+ament_target_dependencies(rgbd
   rclcpp
   sensor_msgs
   cv_bridge
@@ -153,28 +154,50 @@ ament_target_dependencies(multi
   std_msgs
 )
 
-target_link_libraries(multi
+target_link_libraries(rgbd
+  # OpenCv libs
   ${OpenCV_LIBS}
   ${cv_bridge_LIBRARIES}
+
+  # Visualization
   ${SFML_LIBRARIES}
   
-  # Bibliotecas da Astra (verifique os nomes no diretório /lib/)
+  # Astra libs
   ${ASTRA_LIBRARIES}
-  "${ASTRA_SDK_LIB}/libastra_core_api.so"  # Principal
-  "${ASTRA_SDK_LIB}/libastra.so"           # Se existir
-  "${ASTRA_SDK_LIB}/libastra_core.so"      # Se existir
-  # Outras dependências do sistema (se necessário)
-  -ludev                                   # Para acesso USB (comum em drivers de câmera)
+  "${ASTRA_SDK_LIB}/libastra_core_api.so"  # Main
+  "${ASTRA_SDK_LIB}/libastra.so"           
+  "${ASTRA_SDK_LIB}/libastra_core.so"      
 )
 
-install(TARGETS multi DESTINATION lib/${PROJECT_NAME})
+# ===============================================================
+# ========================= CAMERA INFO =========================
+# ===============================================================
 
-# ===== INSTALAÇÃO =====
+add_executable(camera_info_calibration
+  src/camera_info_calibration.cpp 
+)
 
-# Instala as bibliotecas da Astra junto com seu pacote
+ament_target_dependencies(camera_info_calibration
+  rclcpp
+  sensor_msgs
+)
+
+# ===== EXECUTABLES INSTALLATION =====
+install(TARGETS ${${PROJECT_NAME}_SOURCES}
+  DESTINATION
+  lib/${PROJECT_NAME}
+)
+
+# ===== LIBS INSTALLATION =====
 install(DIRECTORY ${ASTRA_SDK_LIB}/
   DESTINATION lib
   FILES_MATCHING PATTERN "*.so*"
+)
+
+# ===== LAUNCH INSTALLATION =====
+install(DIRECTORY 
+  launch
+  DESTINATION share/${PROJECT_NAME}
 )
 
 ament_package()

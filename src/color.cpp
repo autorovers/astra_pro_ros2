@@ -1,4 +1,4 @@
-// Core ROS 2
+// ROS 2
 #include <rclcpp/rclcpp.hpp>
 #include <sensor_msgs/msg/image.hpp>
 #include <std_msgs/msg/header.hpp>
@@ -13,48 +13,79 @@
 
 // Astra SDK
 #include <astra/astra.hpp>
-// #include <key_handler.h>
 
 
+// Namespaces resolution
 using namespace std::chrono_literals;
+
+
 
 class AstraColorPublisher : public rclcpp::Node, public astra::FrameListener
 {
 public:
-    AstraColorPublisher()
-    : Node("astra_color_publisher")
+    AstraColorPublisher(const std::string& node_name)
+    : Node(node_name)
     {
+        // =================================================
+        //     PARAMETERS
+        // =================================================
+
+        // Declare camera settings as ros2 parameters
+        this->declare_parameter<int>("width", 640);
+        this->declare_parameter<int>("height", 480);
+        this->declare_parameter<int>("fps", 30);
+        
+        // Setting the plugins for image transporte publisher
+        this->declare_parameter("color.enable_pub_plugins", std::vector<std::string>{"image_transport/compressed"});
+
+        // =================================================
+        //     ASTRA SYSTEM
+        // =================================================
+
+        // Initialize astra system
         astra::initialize();
         
+        // Create a reader from the stream set
         streamSet_ = std::make_unique<astra::StreamSet>();
         reader_ = std::make_unique<astra::StreamReader>(streamSet_->create_reader());
         
-        // 1. Obter o stream de cor a partir do reader
+        // Create a color stream from the reader
         auto colorStream = reader_->stream<astra::ColorStream>();
         
-        // 2. Criar um objeto ImageMode para definir a configuração desejada
-        // Nota: Esta configuração deve ser suportada pela sua câmera.
-        std::uint32_t Framewidth_ = 640;
-        std::uint32_t FrameHeight_ = 480;
-        std::uint32_t StreamFPS_ = 30;
-        astra_pixel_format_t PixelFormat_ = ASTRA_PIXEL_FORMAT_RGB888;
+        // Get parameters values
+        std::uint32_t Framewidth_ = this->get_parameter("width").as_int();
+        std::uint32_t FrameHeight_ = this->get_parameter("height").as_int();
+        std::uint32_t StreamFPS_ = this->get_parameter("fps").as_int();
+        astra_pixel_format_t PixelFormat_ = ASTRA_PIXEL_FORMAT_RGB888; 
+
+        // Define color mode
         astra::ImageStreamMode colorMode = astra::ImageStreamMode(Framewidth_, FrameHeight_, StreamFPS_, PixelFormat_);
         
-        // 3. Aplicar o modo desejado ao stream de cor
+        // Apply color mode settings to the stream
         colorStream.set_mode(colorMode);
         
-        // 4. Iniciar o stream com a nova configuração
+        // Start color stream
         colorStream.start();
         
+        // Add this node as a listener to camera info
         reader_->add_listener(*this);
-                
+
+        RCLCPP_INFO(this->get_logger(), "RGB Camera stream has started!");
+          
+        // =================================================
+        //     TIMER SETTINGS
+        // =================================================
+
+        period_ = std::chrono::milliseconds(1000 / StreamFPS_);
+
         // Timer para manter astra_update rodando
         timer_ = this->create_wall_timer(
-            33ms,
+            period_,
             [this]() {
                 astra_update();
             }
         );
+
     }
 
     ~AstraColorPublisher()
@@ -65,14 +96,14 @@ public:
 
     void init_transport()
     {
-        image_transport::ImageTransport it(shared_from_this());
-        publisher_ = it.advertise("/astra/color", 10);
+        image_transpor::ImageTransport it(shared_from_this());
+        publisher_ = it_->advertise("color", 10, false);
+
+        RCLCPP_INFO(this->get_logger(), "RGB image topics created!");
     }
 
     virtual void on_frame_ready(astra::StreamReader& reader, astra::Frame& frame) override
     {
-        this->check_fps();
-
         const astra::ColorFrame colorFrame = frame.get<astra::ColorFrame>();
         if (!colorFrame.is_valid())
             return;
@@ -104,29 +135,6 @@ public:
         publisher_.publish(msg);
     }
 
-    void check_fps()
-    {
-        const float frameWeight = .2f;
-
-        const ClockType::time_point now = ClockType::now();
-        const float elapsedMillis = std::chrono::duration_cast<DurationType>(now - prev_).count();
-
-        elapsedMillis_ = elapsedMillis * frameWeight + elapsedMillis_ * (1.f - frameWeight);
-        prev_ = now;
-
-        const float fps = 1000.f / elapsedMillis;
-
-        const auto precision = std::cout.precision();
-
-        std::cout << std::fixed
-                  << std::setprecision(1)
-                  << fps << " fps ("
-                  << std::setprecision(1)
-                  << elapsedMillis_ << " ms)"
-                  << std::setprecision(precision)
-                  << std::endl;
-    }
-
 private:
     image_transport::Publisher publisher_;
 
@@ -139,26 +147,16 @@ private:
     unsigned int lastWidth_ = 0;
     unsigned int lastHeight_ = 0;
 
-    // check fps
-    using DurationType = std::chrono::milliseconds;
-    using ClockType = std::chrono::high_resolution_clock;
-
-    ClockType::time_point prev_;
-    float elapsedMillis_{.0f};
+    std::chorno::milliseconds period;
 };
 
 
 int main(int argc, char * argv[])
 {
     rclcpp::init(argc, argv);
-    auto node = std::make_shared<AstraColorPublisher>();
-
+    auto node = std::make_shared<AstraColorPublisher>("color");
     node->init_transport();
-
-    rclcpp::executors::MultiThreadedExecutor executor(rclcpp::ExecutorOptions(), 4);
-    executor.add_node(node);
-    executor.spin();
-
+    rclcpp::spin(node);
     rclcpp::shutdown();
     return 0;
 }

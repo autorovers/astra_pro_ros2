@@ -17,8 +17,7 @@
   <depend>opencv4</depend>
 
   <!-- Dependências do sistema (bibliotecas necessárias) -->
-  <depend>libsfml-dev</depend>   <!-- SFML (se a Astra SDK usa gráficos/multimídia) -->
-  <depend>libudev-dev</depend>   <!-- Para acesso USB (comum em drivers de câmera) -->
+  <depend>libsfml-dev</depend>
 
   <export>
     <build_type>ament_cmake</build_type>
