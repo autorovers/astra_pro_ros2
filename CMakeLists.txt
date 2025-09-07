@@ -3,7 +3,7 @@ project(astra_pro_ros2)
 
 # Configurações do compilador (opcional)
 if(CMAKE_COMPILER_IS_GNUCXX OR CMAKE_CXX_COMPILER_ID MATCHES "Clang")
-  add_compile_options(-Wall -Wextra -Wpedantic)
+  add_compile_options(-Wall -Wextra -Wno-pedantic -Wno-ignored-qualifiers -Wno-unused-parameter -Wno-unused-variable)
 endif()
 
 # ===== ASTRA SDK CONFIG =====
@@ -50,7 +50,7 @@ set("${PROJECT_NAME}_SOURCES"
   color
   depth
   rgbd 
-  camera_info_calibration
+  # camera_info_calibration
 )
 
 # ===============================================================
@@ -60,18 +60,10 @@ add_executable(color
   src/color.cpp  
 )
 
-# ===== LINKAGEM =====
-target_include_directories(color PUBLIC
-  ${cv_bridge_INCLUDE_DIRS}
-)
-
-set_target_properties(color PROPERTIES FOLDER "${SAMPLE_DIR_FOLDER}/cpp-api")
-
 ament_target_dependencies(color
   rclcpp
   sensor_msgs
   cv_bridge
-  OpenCV
   image_transport
   std_msgs
 )
@@ -86,7 +78,7 @@ target_link_libraries(color
   
   # Astra libs
   ${ASTRA_LIBRARIES}
-  "${ASTRA_SDK_LIB}/libastra_core_api.so"  # Main
+  "${ASTRA_SDK_LIB}/libastra_core_api.so" 
   "${ASTRA_SDK_LIB}/libastra.so"           
   "${ASTRA_SDK_LIB}/libastra_core.so"          
 )
@@ -99,18 +91,10 @@ add_executable(depth
   src/depth.cpp 
 )
 
-# ===== LINKAGEM =====
-target_include_directories(depth PUBLIC
-  ${cv_bridge_INCLUDE_DIRS}
-)
-
-set_target_properties(depth PROPERTIES FOLDER "${SAMPLE_DIR_FOLDER}/cpp-api")
-
 ament_target_dependencies(depth
   rclcpp
   sensor_msgs
   cv_bridge
-  OpenCV
   image_transport
   std_msgs
 )
@@ -125,31 +109,23 @@ target_link_libraries(depth
   
   # Astra libs
   ${ASTRA_LIBRARIES}
-  "${ASTRA_SDK_LIB}/libastra_core_api.so"  # Main
+  "${ASTRA_SDK_LIB}/libastra_core_api.so" 
   "${ASTRA_SDK_LIB}/libastra.so"           
   "${ASTRA_SDK_LIB}/libastra_core.so" 
 )
 
 
-# ===============================================================
-# ==================== ASTRA RGBD-D PUBLISHER ===================
-# ===============================================================
+# # ===============================================================
+# # ==================== ASTRA RGBD-D PUBLISHER ===================
+# # ===============================================================
 add_executable(rgbd 
   src/rgbd.cpp 
 )
-
-# ===== LINKAGEM =====
-target_include_directories(rgbd PUBLIC
-  ${cv_bridge_INCLUDE_DIRS}
-)
-
-set_target_properties(rgbd PROPERTIES FOLDER "${SAMPLE_DIR_FOLDER}/cpp-api")
 
 ament_target_dependencies(rgbd
   rclcpp
   sensor_msgs
   cv_bridge
-  OpenCV
   image_transport
   std_msgs
 )
@@ -164,7 +140,7 @@ target_link_libraries(rgbd
   
   # Astra libs
   ${ASTRA_LIBRARIES}
-  "${ASTRA_SDK_LIB}/libastra_core_api.so"  # Main
+  "${ASTRA_SDK_LIB}/libastra_core_api.so"
   "${ASTRA_SDK_LIB}/libastra.so"           
   "${ASTRA_SDK_LIB}/libastra_core.so"      
 )
@@ -173,14 +149,14 @@ target_link_libraries(rgbd
 # ========================= CAMERA INFO =========================
 # ===============================================================
 
-add_executable(camera_info_calibration
-  src/camera_info_calibration.cpp 
-)
+# add_executable(camera_info_calibration
+#   src/camera_info_calibration.cpp 
+# )
 
-ament_target_dependencies(camera_info_calibration
-  rclcpp
-  sensor_msgs
-)
+# ament_target_dependencies(camera_info_calibration
+#   rclcpp
+#   sensor_msgs
+# )
 
 # ===== EXECUTABLES INSTALLATION =====
 install(TARGETS ${${PROJECT_NAME}_SOURCES}

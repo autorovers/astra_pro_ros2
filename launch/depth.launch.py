@@ -5,10 +5,10 @@ def generate_launch_description():
 
     ld = LaunchDescription()
 
-    color_node = Node(
+    depth_node = Node(
         package="astra_pro_ros2",
-        executable="color",
-        name="rgb_camera_publisher",
+        executable="depth",
+        name="depth_camera_publisher",
         namespace="astra",
         parameters=[
             {"width": 640},
@@ -18,6 +18,6 @@ def generate_launch_description():
         ],
     )
 
-    ld.add_action(color_node)
-
+    ld.add_action(depth_node)
+    
     return ld

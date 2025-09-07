@@ -1,55 +1,83 @@
+// ROS 2
 #include <rclcpp/rclcpp.hpp>
 #include <sensor_msgs/msg/image.hpp>
 #include <std_msgs/msg/header.hpp>
 #include <image_transport/image_transport.hpp>
+#include <sensor_msgs/image_encodings.hpp>
 
+// Astra SDK
 #include <astra/astra.hpp>
+
+// built-in 
 #include <memory>
 #include <iomanip>
 #include <chrono>
 #include <cstring>
 
-using namespace std::chrono_literals;
+
 
 class AstraDepthPublisher : public rclcpp::Node, public astra::FrameListener
 {
 public:
-    AstraDepthPublisher()
-    : Node("astra_depth_publisher")
+    AstraDepthPublisher(const std::string& node_name)
+    : Node(node_name)
     {
+        // =================================================
+        //     PARAMETERS
+        // =================================================
+
+        // Declare camera settings as ros2 parameters
+        this->declare_parameter<int>("width", 640);
+        this->declare_parameter<int>("height", 480);
+        this->declare_parameter<int>("fps", 30);
+        this->declare_parameter<bool>("check_fps", false);
+        
+        // Setting the plugins for image transporte publisher
+        this->declare_parameter("depth.enable_pub_plugins", std::vector<std::string>{"image_transport/compressedDepth"});
+
+        // =================================================
+        //     ASTRA SYSTEM
+        // =================================================
+
+        // Initialize astra system
         astra::initialize();
 
+        // Create a reader from the stream set
         streamSet_ = std::make_unique<astra::StreamSet>();
         reader_ = std::make_unique<astra::StreamReader>(streamSet_->create_reader());
 
-        // Criar e configurar DepthStream
-        auto depthStream = reader_->stream<astra::DepthStream>();
+        // Create a depth stream from the reader
+        astra::DepthStream depthStream = reader_->stream<astra::DepthStream>();
 
-        std::uint32_t FrameWidth_ = 640;
-        std::uint32_t FrameHeight_ = 480;
-        std::uint32_t StreamFPS_ = 30;
-        astra_pixel_format_t PixelFormat_ = ASTRA_PIXEL_FORMAT_DEPTH_MM;
+        // Get parameters values
+        std::uint32_t FrameWidth_ = this->get_parameter("width").as_int();
+        std::uint32_t FrameHeight_ = this->get_parameter("height").as_int();
+        std::uint32_t StreamFPS_ = this->get_parameter("fps").as_int();
+        bool check_fps_ = this->get_parameter("check_fps").as_bool();
 
-        astra::ImageStreamMode depthMode(FrameWidth_, FrameHeight_, StreamFPS_, PixelFormat_);
+        // Define stream mode
+        astra::ImageStreamMode depthMode(FrameWidth_, FrameHeight_, StreamFPS_, ASTRA_PIXEL_FORMAT_DEPTH_MM);
+
+        // Apply depth mode settings to the stream
         depthStream.set_mode(depthMode);
+
+        // Start depth stream
         depthStream.start();
 
-        // Info extra
-        char serialnumber[256];
-        depthStream.serial_number(serialnumber, 256);
-        std::cout << "depthStream -- hFov: "
-                  << depthStream.hFov()
-                  << " vFov: "
-                  << depthStream.vFov()
-                  << " serial number: "
-                  << serialnumber
-                  << std::endl;
-
+        // Add this node as a listener to camera info
         reader_->add_listener(*this);
 
-        // Timer para manter astra_update rodando
+        RCLCPP_INFO(this->get_logger(), "Depth camera stream started!");
+
+        // =================================================
+        //     TIMER SETTINGS
+        // =================================================
+
+        period_ = std::chrono::milliseconds(1000 / StreamFPS_);
+
+        // Keep astra_update callback running
         timer_ = this->create_wall_timer(
-            33ms,
+            period_,
             [this]() {
                 astra_update();
             }
@@ -65,12 +93,14 @@ public:
     void init_transport()
     {
         image_transport::ImageTransport it(shared_from_this());
-        publisher_ = it.advertise("/camera/depth", 10);
+
+        publisher_ = it.advertise("depth", 10);
+        RCLCPP_INFO(this->get_logger(), "Depth image topics created!");
     }
 
     virtual void on_frame_ready(astra::StreamReader& reader, astra::Frame& frame) override
     {
-        check_fps();
+        if (check_fps_) check_fps();
 
         const astra::DepthFrame depthFrame = frame.get<astra::DepthFrame>();
         if (!depthFrame.is_valid())
@@ -88,13 +118,13 @@ public:
 
         depthFrame.copy_to(buffer_.get());
 
-        // Preencher mensagem ROS
+        // ROS msg
         auto msg = sensor_msgs::msg::Image();
         msg.header.stamp = this->now();
         msg.header.frame_id = "astra_depth_optical_frame";
         msg.height = height;
         msg.width = width;
-        msg.encoding = "16UC1";  // profundidade em mm
+        msg.encoding = sensor_msgs::image_encodings::TYPE_16UC1; // depth in mm
         msg.is_bigendian = false;
         msg.step = width * sizeof(uint16_t);
         msg.data.resize(width * height * sizeof(uint16_t));
@@ -135,10 +165,13 @@ private:
     std::unique_ptr<int16_t[]> buffer_;
     unsigned int lastWidth_ = 0;
     unsigned int lastHeight_ = 0;
+    
+    std::chrono::milliseconds period_;
 
+    // Check fps 
+    bool check_fps_;
     using DurationType = std::chrono::milliseconds;
     using ClockType = std::chrono::high_resolution_clock;
-
     ClockType::time_point prev_;
     float elapsedMillis_{.0f};
 };
@@ -147,14 +180,10 @@ private:
 int main(int argc, char * argv[])
 {
     rclcpp::init(argc, argv);
-    auto node = std::make_shared<AstraDepthPublisher>();
-
+    auto node = std::make_shared<AstraDepthPublisher>("depth_publisher");
     node->init_transport();
-
-    rclcpp::executors::MultiThreadedExecutor executor(rclcpp::ExecutorOptions(), 4);
-    executor.add_node(node);
-    executor.spin();
-
+    rclcpp::spin(node);
     rclcpp::shutdown();
+
     return 0;
 }

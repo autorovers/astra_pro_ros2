@@ -76,8 +76,8 @@ private:
 int main(int argc, char **argv)
 {
     rclcpp::init(argc, argv);
-    auto = std::make_shared<>
-    rclcpp::spin(std::make_shared<CameraInfoNode>());
+    auto node = std::make_shared<CameraInfoNode>();
+    rclcpp::spin(node);
     rclcpp::shutdown();
     return 0;
 }
