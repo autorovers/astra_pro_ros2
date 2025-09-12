@@ -4,6 +4,7 @@ project(astra_pro_ros2)
 # Configurações do compilador (opcional)
 if(CMAKE_COMPILER_IS_GNUCXX OR CMAKE_CXX_COMPILER_ID MATCHES "Clang")
   add_compile_options(-Wall -Wextra -Wno-pedantic -Wno-ignored-qualifiers -Wno-unused-parameter -Wno-unused-variable)
+  set(CMAKE_CXX_STANDARD 20)
 endif()
 
 # ===== ASTRA SDK CONFIG =====
@@ -42,15 +43,6 @@ include_directories(
   ${OpenCV_INCLUDE_DIRS}     # Headers do OpenCV
   ${SFML_INCLUDE_DIRS}
   ${SAMPLE_COMMON_DIR}
-)
-
-# ===== EXECUTÁVEIS =====
-
-set("${PROJECT_NAME}_SOURCES"
-  color
-  depth
-  rgbd 
-  # camera_info_calibration
 )
 
 # ===============================================================
@@ -115,14 +107,14 @@ target_link_libraries(depth
 )
 
 
-# # ===============================================================
-# # ==================== ASTRA RGBD-D PUBLISHER ===================
-# # ===============================================================
-add_executable(rgbd 
-  src/rgbd.cpp 
+# ===============================================================
+# ==================== ASTRA MULTI PUBLISHER ====================
+# ===============================================================
+add_executable(multi 
+  src/multi.cpp 
 )
 
-ament_target_dependencies(rgbd
+ament_target_dependencies(multi
   rclcpp
   sensor_msgs
   cv_bridge
@@ -130,7 +122,68 @@ ament_target_dependencies(rgbd
   std_msgs
 )
 
-target_link_libraries(rgbd
+target_link_libraries(multi
+  # OpenCv libs
+  ${OpenCV_LIBS}
+  ${cv_bridge_LIBRARIES}
+
+  # Visualization
+  ${SFML_LIBRARIES}
+  
+  # Astra libs
+  ${ASTRA_LIBRARIES}
+  "${ASTRA_SDK_LIB}/libastra_core_api.so"
+  "${ASTRA_SDK_LIB}/libastra.so"           
+  "${ASTRA_SDK_LIB}/libastra_core.so"      
+)
+
+# # ===============================================================
+# # ================ ASTRA multi-D ALIGNED PUBLISHER ===============
+# # ===============================================================
+# add_executable(multi_aligned 
+#   src/multi_aligned.cpp 
+# )
+
+# ament_target_dependencies(multi_aligned
+#   rclcpp
+#   sensor_msgs
+#   cv_bridge
+#   image_transport
+#   std_msgs
+# )
+
+# target_link_libraries(multi_aligned
+#   # OpenCv libs
+#   ${OpenCV_LIBS}
+#   ${cv_bridge_LIBRARIES}
+
+#   # Visualization
+#   ${SFML_LIBRARIES}
+  
+#   # Astra libs
+#   ${ASTRA_LIBRARIES}
+#   "${ASTRA_SDK_LIB}/libastra_core_api.so"
+#   "${ASTRA_SDK_LIB}/libastra.so"           
+#   "${ASTRA_SDK_LIB}/libastra_core.so"      
+# )
+
+
+# ===============================================================
+# ================== ASTRA INFRARED PUBLISHER ===================
+# ===============================================================
+add_executable(infrared 
+  src/infrared.cpp 
+)
+
+ament_target_dependencies(infrared
+  rclcpp
+  sensor_msgs
+  cv_bridge
+  image_transport
+  std_msgs
+)
+
+target_link_libraries(infrared
   # OpenCv libs
   ${OpenCV_LIBS}
   ${cv_bridge_LIBRARIES}
@@ -149,16 +202,25 @@ target_link_libraries(rgbd
 # ========================= CAMERA INFO =========================
 # ===============================================================
 
-# add_executable(camera_info_calibration
-#   src/camera_info_calibration.cpp 
-# )
+add_executable(camera_info_calibration
+  src/calibration/camera_info_calibration.cpp 
+)
 
-# ament_target_dependencies(camera_info_calibration
-#   rclcpp
-#   sensor_msgs
-# )
+ament_target_dependencies(camera_info_calibration
+  rclcpp
+  sensor_msgs
+)
+
 
 # ===== EXECUTABLES INSTALLATION =====
+set("${PROJECT_NAME}_SOURCES"
+  color
+  depth
+  infrared
+  multi 
+  camera_info_calibration
+)
+
 install(TARGETS ${${PROJECT_NAME}_SOURCES}
   DESTINATION
   lib/${PROJECT_NAME}

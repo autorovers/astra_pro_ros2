@@ -30,10 +30,15 @@ public:
         this->declare_parameter<int>("width", 640);
         this->declare_parameter<int>("height", 480);
         this->declare_parameter<int>("fps", 30);
-        this->declare_parameter<bool>("check_fps", false);
-        
+        this->declare_parameter<bool>("only_compressed", false);
+
+        bool only_compressed_ = this->get_parameter("only_compressed").as_bool();
+
         // Setting the plugins for image transporte publisher
-        this->declare_parameter("color.enable_pub_plugins", std::vector<std::string>{"image_transport/compressed"});
+        if (only_compressed_)
+            this->declare_parameter("color.enable_pub_plugins", std::vector<std::string>{"image_transport/compressed"});
+        else 
+            this->declare_parameter("color.enable_pub_plugins", std::vector<std::string>{"image_transport/compressed", "image_transport/raw"});
 
         // =================================================
         //     ASTRA SYSTEM
@@ -52,8 +57,7 @@ public:
         // Get parameters values
         std::uint32_t FrameWidth_ = this->get_parameter("width").as_int();
         std::uint32_t FrameHeight_ = this->get_parameter("height").as_int();
-        std::uint32_t StreamFPS_ = this->get_parameter("fps").as_int();
-        bool check_fps_ = this->get_parameter("check_fps").as_bool();
+        StreamFPS_ = this->get_parameter("fps").as_int();
 
         // Define stream mode
         astra::ImageStreamMode colorMode = astra::ImageStreamMode(FrameWidth_, FrameHeight_, StreamFPS_, ASTRA_PIXEL_FORMAT_RGB888);
@@ -101,7 +105,7 @@ public:
 
     virtual void on_frame_ready(astra::StreamReader& reader, astra::Frame& frame) override
     {
-        if (check_fps_) check_fps();
+        if (!fps_ok) check_fps();
 
         const astra::ColorFrame colorFrame = frame.get<astra::ColorFrame>();
         if (!colorFrame.is_valid())
@@ -134,7 +138,7 @@ public:
         publisher_.publish(msg);
     }
 
-    void check_fps()
+    virtual void check_fps()
     {
         const float frameWeight = .2f;
 
@@ -144,16 +148,20 @@ public:
         elapsedMillis_ = elapsedMillis * frameWeight + elapsedMillis_ * (1.f - frameWeight);
         prev_ = now;
 
-        const float fps = 1000.f / elapsedMillis_;
-
+        const std::uint32_t fps = 1000.f / elapsedMillis_;
         const auto precision = std::cout.precision();
-        std::cout << std::fixed
-                  << std::setprecision(1)
-                  << fps << " fps ("
-                  << std::setprecision(1)
-                  << elapsedMillis_ << " ms)"
-                  << std::setprecision(precision)
-                  << std::endl;
+
+        
+        if (fps == StreamFPS_) 
+        {
+            fps_ok = true;
+            RCLCPP_INFO(this->get_logger(), "\nFPS stabilized: %d FPS", fps);
+        }
+        else  
+        {
+            fps_ok = false;
+            RCLCPP_INFO(this->get_logger(), "Stabilizing the camera's FPS...");
+        }
     }
 
 private:
@@ -173,11 +181,14 @@ private:
     unsigned int lastHeight_ = 0;
 
     // Check fps 
-    bool check_fps_;
     using DurationType = std::chrono::milliseconds;
     using ClockType = std::chrono::high_resolution_clock;
     ClockType::time_point prev_;
     float elapsedMillis_{.0f};
+
+    // Image param
+    std::uint32_t StreamFPS_;
+    bool fps_ok = false;
 };
 
 

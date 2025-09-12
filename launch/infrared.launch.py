@@ -5,22 +5,23 @@ def generate_launch_description():
 
     ld = LaunchDescription()
 
-    color_node = Node(
+    infrared_node = Node(
         package="astra_pro_ros2",
-        executable="color",
-        name="rgb_camera_publisher",
+        executable="infrared",
+        name="infrared_camera_publisher",
         namespace="astra",
         parameters=[
             {"width": 640},
             {"height": 480},
             {"fps": 30},
-            {"only_compressed": False}
+            {"check_fps": False},
+            {"only_compressed": True},
         ],
         remappings={
-            ("color", "color/image_raw"),
+            ("infrared", "infrared/image_rect_raw"),
         }
     )
 
-    ld.add_action(color_node)
-
+    ld.add_action(infrared_node)
+    
     return ld

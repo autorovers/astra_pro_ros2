@@ -3,24 +3,24 @@
 #include <sensor_msgs/msg/image.hpp>
 #include <std_msgs/msg/header.hpp>
 #include <image_transport/image_transport.hpp>
-#include <sensor_msgs/image_encodings.hpp>
+
+// Bridge OpenCV-ROS
+#include <cv_bridge/cv_bridge.hpp>
+
+// OpenCV
+#include <opencv2/imgproc/imgproc.hpp>
+#include <opencv2/highgui/highgui.hpp>
 
 // Astra SDK
 #include <astra/astra.hpp>
 
-// built-in 
-#include <memory>
-#include <iomanip>
-#include <chrono>
-#include <cstring>
 
 
-
-class AstraDepthPublisher 
+class AstraInfraredPublisher 
 : public rclcpp::Node, public astra::FrameListener
 {
 public:
-    AstraDepthPublisher(const std::string& node_name)
+    AstraInfraredPublisher(const std::string& node_name)
     : Node(node_name)
     {
         // =================================================
@@ -38,9 +38,9 @@ public:
 
         // Setting the plugins for image transporte publisher
         if (only_compressed_)
-            this->declare_parameter("depth.enable_pub_plugins", std::vector<std::string>{"image_transport/compressedDepth"});
+            this->declare_parameter("infrared.enable_pub_plugins", std::vector<std::string>{"image_transport/compressed"});
         else 
-            this->declare_parameter("depth.enable_pub_plugins", std::vector<std::string>{"image_transport/compressedDepth", "image_transport/raw"});
+            this->declare_parameter("infrared.enable_pub_plugins", std::vector<std::string>{"image_transport/compressed", "image_transport/raw"});
 
         // =================================================
         //     ASTRA SYSTEM
@@ -48,14 +48,14 @@ public:
 
         // Initialize astra system
         astra::initialize();
-
+        
         // Create a reader from the stream set
         streamSet_ = std::make_unique<astra::StreamSet>();
         reader_ = std::make_unique<astra::StreamReader>(streamSet_->create_reader());
-
-        // Create a depth stream from the reader
-        astra::DepthStream depthStream = reader_->stream<astra::DepthStream>();
-
+        
+        // Create a infrared stream from the reader
+        astra::InfraredStream infraredStream = reader_->stream<astra::InfraredStream>();
+        
         // Get parameters values
         std::uint32_t FrameWidth_ = this->get_parameter("width").as_int();
         std::uint32_t FrameHeight_ = this->get_parameter("height").as_int();
@@ -63,19 +63,19 @@ public:
         bool check_fps_ = this->get_parameter("check_fps").as_bool();
 
         // Define stream mode
-        astra::ImageStreamMode depthMode(FrameWidth_, FrameHeight_, StreamFPS_, ASTRA_PIXEL_FORMAT_DEPTH_MM);
-
-        // Apply depth mode settings to the stream
-        depthStream.set_mode(depthMode);
-
-        // Start depth stream
-        depthStream.start();
-
+        astra::ImageStreamMode infraredMode = astra::ImageStreamMode(FrameWidth_, FrameHeight_, StreamFPS_, ASTRA_PIXEL_FORMAT_RGB888);
+        
+        // Apply color mode settings to the stream
+        infraredStream.set_mode(infraredMode);
+        
+        // Start color stream
+        infraredStream.start();
+        
         // Add this node as a listener to camera info
         reader_->add_listener(*this);
 
-        RCLCPP_INFO(this->get_logger(), "Depth camera stream started!");
-
+        RCLCPP_INFO(this->get_logger(), "Infrared camera stream started!");
+          
         // =================================================
         //     TIMER SETTINGS
         // =================================================
@@ -89,9 +89,10 @@ public:
                 astra_update();
             }
         );
+
     }
 
-    ~AstraDepthPublisher()
+    ~AstraInfraredPublisher()
     {
         reader_->remove_listener(*this);
         astra::terminate();
@@ -101,41 +102,41 @@ public:
     {
         image_transport::ImageTransport it(shared_from_this());
 
-        publisher_ = it.advertise("depth", 10);
-        RCLCPP_INFO(this->get_logger(), "Depth image topics created!");
+        publisher_ = it.advertise("infrared", 10, false);
+        RCLCPP_INFO(this->get_logger(), "Infrared image topics created!");
     }
 
     virtual void on_frame_ready(astra::StreamReader& reader, astra::Frame& frame) override
     {
         if (check_fps_) check_fps();
 
-        const astra::DepthFrame depthFrame = frame.get<astra::DepthFrame>();
-        if (!depthFrame.is_valid())
+        const astra::InfraredFrameRgb infraredFrame = frame.get<astra::InfraredFrameRgb>();
+        if (!infraredFrame.is_valid())
             return;
 
-        unsigned int width = depthFrame.width();
-        unsigned int height = depthFrame.height();
+        unsigned int width = infraredFrame.width();
+        unsigned int height = infraredFrame.height();
 
         if (width != lastWidth_ || height != lastHeight_)
         {
-            buffer_ = std::make_unique<int16_t[]>(depthFrame.length());
+            buffer_ = std::make_unique<astra::RgbPixel[]>(infraredFrame.length());
             lastWidth_ = width;
             lastHeight_ = height;
         }
 
-        depthFrame.copy_to(buffer_.get());
+        infraredFrame.copy_to(buffer_.get());
 
         // ROS msg
         auto msg = sensor_msgs::msg::Image();
         msg.header.stamp = this->now();
-        msg.header.frame_id = "astra_depth_optical_frame";
+        msg.header.frame_id = "astra_infrared_optical_frame";
         msg.height = height;
         msg.width = width;
-        msg.encoding = sensor_msgs::image_encodings::TYPE_16UC1; // depth in mm
+        msg.encoding = sensor_msgs::image_encodings::RGB8;  
         msg.is_bigendian = false;
-        msg.step = width * sizeof(uint16_t);
-        msg.data.resize(width * height * sizeof(uint16_t));
-        std::memcpy(msg.data.data(), buffer_.get(), width * height * sizeof(uint16_t));
+        msg.step = width * 3; 
+        msg.data.resize(width * height * 3);
+        std::memcpy(msg.data.data(), buffer_.get(), width * height * 3);
 
         publisher_.publish(msg);
     }
@@ -163,17 +164,20 @@ public:
     }
 
 private:
+    // Publishers
     image_transport::Publisher publisher_;
+    
+    // Timers
+    std::chrono::milliseconds period_;
     rclcpp::TimerBase::SharedPtr timer_;
 
+    // Astra SDK
     std::unique_ptr<astra::StreamSet> streamSet_;
     std::unique_ptr<astra::StreamReader> reader_;
 
-    std::unique_ptr<int16_t[]> buffer_;
+    std::unique_ptr<astra::RgbPixel[]> buffer_;
     unsigned int lastWidth_ = 0;
     unsigned int lastHeight_ = 0;
-    
-    std::chrono::milliseconds period_;
 
     // Check fps 
     bool check_fps_;
@@ -187,7 +191,7 @@ private:
 int main(int argc, char * argv[])
 {
     rclcpp::init(argc, argv);
-    auto node = std::make_shared<AstraDepthPublisher>("depth_publisher");
+    auto node = std::make_shared<AstraInfraredPublisher>("infrared_publisher");
     node->init_transport();
     rclcpp::spin(node);
     rclcpp::shutdown();

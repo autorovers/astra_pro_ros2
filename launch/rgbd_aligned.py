@@ -5,22 +5,19 @@ def generate_launch_description():
 
     ld = LaunchDescription()
 
-    color_node = Node(
+    rgbd_node = Node(
         package="astra_pro_ros2",
-        executable="color",
-        name="rgb_camera_publisher",
+        executable="rgbd_aligned",
+        name="rgbd_aligned_camera_publisher",
         namespace="astra",
         parameters=[
             {"width": 640},
             {"height": 480},
             {"fps": 30},
-            {"only_compressed": False}
+            {"check_fps": True},
         ],
-        remappings={
-            ("color", "color/image_raw"),
-        }
     )
 
-    ld.add_action(color_node)
+    ld.add_action(rgbd_node)
 
     return ld
