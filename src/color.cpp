@@ -103,6 +103,41 @@ public:
         RCLCPP_INFO(this->get_logger(), "RGB image topics created!");
     }
 
+private:
+
+    // =================================================
+    //     ATTRIBUTES
+    // =================================================
+
+    // Publishers
+    image_transport::Publisher publisher_;
+
+    // Timers
+    std::chrono::milliseconds period_;
+    rclcpp::TimerBase::SharedPtr timer_;
+
+    // Astra SDK
+    std::unique_ptr<astra::StreamSet> streamSet_;
+    std::unique_ptr<astra::StreamReader> reader_;
+
+    std::unique_ptr<astra::RgbPixel[]> buffer_;
+    unsigned int lastWidth_ = 0;
+    unsigned int lastHeight_ = 0;
+
+    // Check fps 
+    using DurationType = std::chrono::milliseconds;
+    using ClockType = std::chrono::high_resolution_clock;
+    ClockType::time_point prev_;
+    float elapsedMillis_{.0f};
+    std::uint32_t StreamFPS_;
+    bool fps_ok = false;
+
+
+    // =================================================
+    //     METHODS
+    // =================================================
+
+
     virtual void on_frame_ready(astra::StreamReader& reader, astra::Frame& frame) override
     {
         if (!fps_ok) check_fps();
@@ -133,10 +168,32 @@ public:
         msg.is_bigendian = false;
         msg.step = width * 3; 
         msg.data.resize(width * height * 3);
-        std::memcpy(msg.data.data(), buffer_.get(), width * height * 3);
+        // std::memcpy(msg.data.data(), buffer_.get(), width * height * 3); Uncomment to unflip
+        
+        // Inverter horizontalmente a imagem  
 
+        // Buffer temporário para uma linha
+        std::vector<uint8_t> temp_line(width * 3);
+
+        for (unsigned int y = 0; y < height; ++y)
+        {
+            uint8_t* row_src = reinterpret_cast<uint8_t*>(buffer_.get()) + y * width * 3;
+            uint8_t* row_dst = msg.data.data() + y * width * 3;
+
+            // Copia cada linha invertida horizontalmente
+            for (unsigned int x = 0; x < width; ++x)
+            {
+                unsigned int src_idx = x * 3;
+                unsigned int dst_idx = (width - 1 - x) * 3;
+
+                row_dst[dst_idx + 0] = row_src[src_idx + 0]; // R
+                row_dst[dst_idx + 1] = row_src[src_idx + 1]; // G
+                row_dst[dst_idx + 2] = row_src[src_idx + 2]; // B
+            }
+        }
         publisher_.publish(msg);
     }
+
 
     virtual void check_fps()
     {
@@ -160,35 +217,9 @@ public:
         else  
         {
             fps_ok = false;
-            RCLCPP_INFO(this->get_logger(), "Stabilizing the camera's FPS...");
+            RCLCPP_INFO(this->get_logger(), "Stabilizing camera FPS...");
         }
     }
-
-private:
-    // Publishers
-    image_transport::Publisher publisher_;
-
-    // Timers
-    std::chrono::milliseconds period_;
-    rclcpp::TimerBase::SharedPtr timer_;
-
-    // Astra SDK
-    std::unique_ptr<astra::StreamSet> streamSet_;
-    std::unique_ptr<astra::StreamReader> reader_;
-
-    std::unique_ptr<astra::RgbPixel[]> buffer_;
-    unsigned int lastWidth_ = 0;
-    unsigned int lastHeight_ = 0;
-
-    // Check fps 
-    using DurationType = std::chrono::milliseconds;
-    using ClockType = std::chrono::high_resolution_clock;
-    ClockType::time_point prev_;
-    float elapsedMillis_{.0f};
-
-    // Image param
-    std::uint32_t StreamFPS_;
-    bool fps_ok = false;
 };
 
 

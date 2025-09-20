@@ -11,11 +11,21 @@ def generate_launch_description():
         name="rgbd_camera_publisher",
         namespace="astra",
         parameters=[
+
+            # Camera parameters
             {"width": 640},
             {"height": 480},
             {"fps": 30},
-            {"check_fps": True},
-            {"only_compressed": False},
+
+            # Select streams
+            {"color": True},
+            {"depth": False},
+            {"infrared": True},
+
+            # Select transport modes (only one option must be True)
+            {"image_compressed_only": False},
+            {"image_raw_only": True},
+            {"compressed_and_raw": False},
         ],
         remappings={
             ("infrared", "infrared/image_rect_raw"),
